@@ -1,0 +1,70 @@
+# Gmail Extractor gitignore
+
+# API credentials and tokens
+credentials.json
+token.pickle
+*.json
+!requirements.json
+
+# Email data and PII
+email_addresses.txt
+extracted_emails/
+*.csv
+*.html
+*.eml
+*.mbox
+
+# Logs and temporary files (may contain PII)
+*.log
+logs/
+temp/
+tmp/
+*.tmp
+*.bak
+*.backup
+
+# Config files that may contain emails/credentials
+config.ini
+config.yaml
+config.yml
+settings.json
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
