@@ -7,7 +7,7 @@ A CLI tool to extract emails to/from specific email addresses from your Gmail ac
 ## Features
 
 - **Interactive Setup Wizard** - Guided Gmail API setup in 3-5 minutes
-- **Unified Interactive Menu** - Simple, easy-to-use interface for all operations
+- **Continuous Interactive Menu** - Simple menu that loops after each operation, no need to restart
 - **Attachment Download** - Optional download of email attachments
 - Extract emails where specific addresses appear in From, To, or CC fields
 - **Case-insensitive email matching** - Handles emails regardless of capitalization
@@ -117,7 +117,7 @@ Then validate your setup:
 
 ## Usage
 
-The tool uses an interactive menu system. Simply run:
+The tool uses an interactive menu system that loops continuously. Simply run:
 
 ```bash
 ./run.sh
@@ -133,6 +133,8 @@ You'll see a menu with these options:
 5. **Extract emails (with attachments)** - Extract emails and download attachments
 6. **Reset authentication** - Delete saved tokens
 7. **Exit** - Quit the program
+
+**The menu will automatically return after each operation**, allowing you to perform multiple tasks in one session. Select option 7 when you're done to exit.
 
 ### Create email addresses file
 
@@ -219,7 +221,7 @@ Each email is saved as an HTML file with:
 
 ## Interactive Menu Reference
 
-The tool now uses a unified interactive menu. Simply run:
+The tool uses a unified interactive menu that continuously loops, allowing you to perform multiple operations without restarting. Simply run:
 
 ```bash
 python gmail_extractor.py
@@ -235,31 +237,39 @@ Menu options:
 6. **Reset authentication** - Delete saved tokens (useful for switching accounts)
 7. **Exit** - Quit the program
 
+After each operation completes, you'll be returned to the menu. This allows you to chain operations together (e.g., setup → validate → extract) in a single session.
+
 ### Workflow Example
 
+**First-time setup (all in one session):**
 ```bash
-# First time setup
 ./run.sh
-# Select option 1 (Setup wizard)
-# Follow the guided setup process
 
-# Create email list
-./run.sh
-# Select option 2 (Initialize)
-# Edit email_addresses.txt and add addresses
+# The menu appears - select options in sequence:
+# 1. Select option 1 (Setup wizard) - Follow the guided setup
+# 2. Menu returns - Select option 2 (Initialize) - Creates email_addresses.txt
+# 3. Exit (option 7) and edit email_addresses.txt to add addresses
+# 4. Run ./run.sh again
 
-# Extract emails with attachments
-./run.sh
-# Select option 5 (Extract emails with attachments)
+# Now extract:
+# 5. Select option 5 (Extract emails with attachments)
+# 6. Select option 7 (Exit) when done
+```
 
-# Subsequent runs
+**Typical usage (after setup):**
+```bash
 ./run.sh
-# Select option 4 or 5 depending on whether you want attachments
 
-# Troubleshooting
-./run.sh
-# Select option 3 (Validate setup) - Check status
-# Select option 6 (Reset) - If authentication issues
+# Menu appears - choose what you need:
+# - Option 4 or 5 to extract emails
+# - Option 3 to validate setup
+# - Option 6 to reset authentication if issues occur
+# - Option 7 to exit
+
+# The menu returns after each operation, so you can:
+# - Extract multiple times
+# - Validate between operations
+# - Perform multiple tasks without restarting
 ```
 
 ## Files Created

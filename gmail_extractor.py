@@ -849,38 +849,44 @@ def reset_authentication():
 
 def main():
     """Main CLI entry point"""
-    print("=" * 60)
-    print(f"{Colors.BOLD}{Colors.HEADER}Gmail Email Extractor CLI{Colors.ENDC}")
-    print("=" * 60)
-    print("\nWhat would you like to do?\n")
-    print(f"{Colors.CYAN}1.{Colors.ENDC} Setup wizard (configure Gmail API)")
-    print(f"{Colors.CYAN}2.{Colors.ENDC} Initialize (create email_addresses.txt)")
-    print(f"{Colors.CYAN}3.{Colors.ENDC} Validate setup")
-    print(f"{Colors.CYAN}4.{Colors.ENDC} Extract emails (metadata only)")
-    print(f"{Colors.CYAN}5.{Colors.ENDC} Extract emails (with attachments)")
-    print(f"{Colors.CYAN}6.{Colors.ENDC} Reset authentication")
-    print(f"{Colors.CYAN}7.{Colors.ENDC} Exit")
+    while True:
+        print("\n" + "=" * 60)
+        print(f"{Colors.BOLD}{Colors.HEADER}Gmail Email Extractor CLI{Colors.ENDC}")
+        print("=" * 60)
+        print("\nWhat would you like to do?\n")
+        print(f"{Colors.CYAN}1.{Colors.ENDC} Setup wizard (configure Gmail API)")
+        print(f"{Colors.CYAN}2.{Colors.ENDC} Initialize (create email_addresses.txt)")
+        print(f"{Colors.CYAN}3.{Colors.ENDC} Validate setup")
+        print(f"{Colors.CYAN}4.{Colors.ENDC} Extract emails (metadata only)")
+        print(f"{Colors.CYAN}5.{Colors.ENDC} Extract emails (with attachments)")
+        print(f"{Colors.CYAN}6.{Colors.ENDC} Reset authentication")
+        print(f"{Colors.CYAN}7.{Colors.ENDC} Exit")
 
-    choice = input(f"\n{Colors.BOLD}Enter choice (1-7):{Colors.ENDC} ").strip()
+        choice = input(f"\n{Colors.BOLD}Enter choice (1-7):{Colors.ENDC} ").strip()
 
-    if choice == '1':
-        interactive_setup_wizard()
-    elif choice == '2':
-        generate_sample_email_file()
-    elif choice == '3':
-        validate_setup()
-    elif choice == '4':
-        extractor = GmailExtractor()
-        extractor.run(download_attachments=False)
-    elif choice == '5':
-        extractor = GmailExtractor()
-        extractor.run(download_attachments=True)
-    elif choice == '6':
-        reset_authentication()
-    elif choice == '7':
-        print("\nGoodbye!")
-    else:
-        print_error("\nInvalid choice. Please run the script again and choose 1-7.")
+        if choice == '1':
+            interactive_setup_wizard()
+        elif choice == '2':
+            generate_sample_email_file()
+        elif choice == '3':
+            validate_setup()
+        elif choice == '4':
+            extractor = GmailExtractor()
+            extractor.run(download_attachments=False)
+        elif choice == '5':
+            extractor = GmailExtractor()
+            extractor.run(download_attachments=True)
+        elif choice == '6':
+            reset_authentication()
+        elif choice == '7':
+            print("\nGoodbye!")
+            break
+        else:
+            print_error("\nInvalid choice. Please enter a number between 1-7.")
+
+        # Pause before showing menu again (except for exit)
+        if choice != '7':
+            input(f"\n{Colors.BOLD}Press Enter to continue...{Colors.ENDC}")
 
 
 if __name__ == '__main__':
