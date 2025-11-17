@@ -138,7 +138,7 @@ class GmailExtractor:
         if not is_valid:
             print_error(f"Credentials validation failed: {error_msg}")
             print_info("\nRun the setup wizard to configure Gmail API access:")
-            print(f"  {Colors.BOLD}python gmail_extractor.py setup{Colors.ENDC}")
+            print(f"  {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 1 (Setup wizard)")
             print("\nOr manually:")
             print("  1. Go to https://console.cloud.google.com/")
             print("  2. Create a project and enable Gmail API")
@@ -196,23 +196,31 @@ class GmailExtractor:
             sys.exit(1)
 
     def load_email_addresses(self):
-        """Load email addresses from the text file"""
+        """Load email addresses from the text file (case-insensitive, deduplicated)"""
         if not os.path.exists(EMAIL_ADDRESSES_FILE):
-            print(f"Error: {EMAIL_ADDRESSES_FILE} not found!")
-            print("Please create this file and add email addresses (one per line)")
+            print_error(f"{EMAIL_ADDRESSES_FILE} not found!")
+            print_info("Please create this file and add email addresses (one per line)")
+            print(f"\nRun: {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 2 (Initialize)")
             sys.exit(1)
 
         with open(EMAIL_ADDRESSES_FILE, 'r') as f:
-            self.email_addresses = [
-                line.strip() for line in f
-                if line.strip() and not line.startswith('#')
-            ]
+            # Normalize to lowercase and remove duplicates while preserving order
+            addresses = []
+            seen = set()
+            for line in f:
+                email = line.strip().lower()
+                if email and not email.startswith('#') and email not in seen:
+                    addresses.append(email)
+                    seen.add(email)
+
+        self.email_addresses = addresses
 
         if not self.email_addresses:
-            print(f"No email addresses found in {EMAIL_ADDRESSES_FILE}")
+            print_error(f"No email addresses found in {EMAIL_ADDRESSES_FILE}")
+            print_info("Add email addresses to the file (one per line)")
             sys.exit(1)
 
-        print(f"Loaded {len(self.email_addresses)} email address(es):")
+        print_success(f"Loaded {len(self.email_addresses)} unique email address(es):")
         for email in self.email_addresses:
             print(f"  - {email}")
 
@@ -303,6 +311,94 @@ class GmailExtractor:
 
         return text_body
 
+    def extract_attachments(self, message: Dict, attachments_dir: Path) -> List[str]:
+        """Extract and save attachments from an email message
+
+        Args:
+            message: The Gmail message object
+            attachments_dir: Directory to save attachments to
+
+        Returns:
+            List of saved attachment filenames
+        """
+        saved_attachments = []
+
+        def process_parts(parts):
+            """Recursively process message parts to find attachments"""
+            for part in parts:
+                # Check if part has sub-parts (multipart)
+                if 'parts' in part:
+                    process_parts(part['parts'])
+                    continue
+
+                # Check if this part is an attachment
+                filename = part.get('filename', '')
+                if filename:
+                    # This part has a filename, it's an attachment
+                    attachment_id = part['body'].get('attachmentId')
+
+                    if attachment_id:
+                        # Download attachment using attachmentId
+                        try:
+                            attachment = self.service.users().messages().attachments().get(
+                                userId='me',
+                                messageId=message['id'],
+                                id=attachment_id
+                            ).execute()
+
+                            # Decode and save attachment
+                            file_data = base64.urlsafe_b64decode(attachment['data'])
+                            safe_filename = self.sanitize_filename(filename)
+
+                            # Handle duplicate filenames
+                            filepath = attachments_dir / safe_filename
+                            counter = 1
+                            while filepath.exists():
+                                name, ext = os.path.splitext(safe_filename)
+                                safe_filename = f"{name}_{counter}{ext}"
+                                filepath = attachments_dir / safe_filename
+                                counter += 1
+
+                            # Save file
+                            with open(filepath, 'wb') as f:
+                                f.write(file_data)
+
+                            saved_attachments.append(safe_filename)
+
+                        except Exception as e:
+                            print_warning(f"Could not download attachment '{filename}': {e}")
+
+                    elif 'data' in part['body']:
+                        # Attachment data is inline (not using attachmentId)
+                        try:
+                            file_data = base64.urlsafe_b64decode(part['body']['data'])
+                            safe_filename = self.sanitize_filename(filename)
+
+                            # Handle duplicate filenames
+                            filepath = attachments_dir / safe_filename
+                            counter = 1
+                            while filepath.exists():
+                                name, ext = os.path.splitext(safe_filename)
+                                safe_filename = f"{name}_{counter}{ext}"
+                                filepath = attachments_dir / safe_filename
+                                counter += 1
+
+                            # Save file
+                            with open(filepath, 'wb') as f:
+                                f.write(file_data)
+
+                            saved_attachments.append(safe_filename)
+
+                        except Exception as e:
+                            print_warning(f"Could not save attachment '{filename}': {e}")
+
+        # Start processing from payload
+        payload = message.get('payload', {})
+        if 'parts' in payload:
+            process_parts(payload['parts'])
+
+        return saved_attachments
+
     def sanitize_filename(self, filename: str) -> str:
         """Sanitize filename to remove invalid characters"""
         invalid_chars = '<>:"/\\|?*'
@@ -310,8 +406,13 @@ class GmailExtractor:
             filename = filename.replace(char, '_')
         return filename[:200]  # Limit length
 
-    def extract_emails_for_address(self, email_address: str):
-        """Extract all emails for a specific email address"""
+    def extract_emails_for_address(self, email_address: str, download_attachments: bool = False):
+        """Extract all emails for a specific email address
+
+        Args:
+            email_address: Email address to extract emails for
+            download_attachments: Whether to download email attachments
+        """
         message_ids = self.get_messages(email_address)
 
         if not message_ids:
@@ -356,6 +457,24 @@ class GmailExtractor:
 
                 # Get HTML body
                 html_body = self.get_email_body_html(message['payload'])
+
+                # Handle attachments if requested
+                attachment_filenames = []
+                if download_attachments:
+                    # Create email-specific directory for attachments
+                    email_folder_name = f"{idx:04d}_{self.sanitize_filename(subject if subject else 'no_subject')}"
+                    email_folder_path = email_dir / email_folder_name
+                    attachments_dir = email_folder_path / "attachments"
+                    attachments_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Extract attachments (method handles all cases)
+                    attachment_filenames = self.extract_attachments(message, attachments_dir)
+
+                    # Remove directory if no attachments were found
+                    if not attachment_filenames and attachments_dir.exists():
+                        attachments_dir.rmdir()
+                        if email_folder_path.exists() and not any(email_folder_path.iterdir()):
+                            email_folder_path.rmdir()
 
                 # Save HTML file
                 safe_subject = self.sanitize_filename(subject if subject else 'no_subject')
@@ -407,7 +526,8 @@ class GmailExtractor:
                     'To': to_addr,
                     'Cc': cc_addr,
                     'Date': formatted_date,
-                    'Message ID': msg_id
+                    'Message ID': msg_id,
+                    'Attachments': ', '.join(attachment_filenames) if attachment_filenames else ''
                 })
 
                 if idx % 10 == 0:
@@ -420,7 +540,7 @@ class GmailExtractor:
         # Write CSV file
         if csv_data:
             with open(csv_file, 'w', newline='', encoding='utf-8') as f:
-                fieldnames = ['Filename', 'Subject', 'From', 'To', 'Cc', 'Date', 'Message ID']
+                fieldnames = ['Filename', 'Subject', 'From', 'To', 'Cc', 'Date', 'Message ID', 'Attachments']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(csv_data)
@@ -429,10 +549,16 @@ class GmailExtractor:
             print(f"  - CSV file: {csv_file}")
             print(f"  - HTML files: {len(csv_data)} files")
 
-    def run(self):
-        """Main execution method"""
+    def run(self, download_attachments: bool = False):
+        """Main execution method
+
+        Args:
+            download_attachments: Whether to download email attachments
+        """
         print("=" * 60)
         print("Gmail Email Extractor")
+        if download_attachments:
+            print("(With Attachments)")
         print("=" * 60)
 
         # Authenticate
@@ -443,11 +569,13 @@ class GmailExtractor:
 
         # Process each email address
         for email_address in self.email_addresses:
-            self.extract_emails_for_address(email_address)
+            self.extract_emails_for_address(email_address, download_attachments)
 
         print("\n" + "=" * 60)
         print("Extraction complete!")
         print(f"All emails saved to: {OUTPUT_DIR}/")
+        if download_attachments:
+            print("Attachments were downloaded and saved")
         print("=" * 60)
 
 
@@ -462,6 +590,8 @@ def generate_sample_email_file():
 
     sample_content = """# Email addresses to extract (one per line)
 # Lines starting with # are ignored
+# Email addresses are case-insensitive and will be normalized to lowercase
+# Duplicates will be automatically removed
 
 example1@gmail.com
 example2@company.com
@@ -635,9 +765,9 @@ def interactive_setup_wizard():
     print(f"{Colors.GREEN}{Colors.BOLD}Setup Complete!{Colors.ENDC}")
     print("=" * 70)
     print("\nYou're all set! Next steps:")
-    print(f"  1. Create {EMAIL_ADDRESSES_FILE}: python gmail_extractor.py init")
+    print(f"  1. Run {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 2 to create {EMAIL_ADDRESSES_FILE}")
     print("  2. Add email addresses to extract")
-    print("  3. Run extraction: python gmail_extractor.py extract")
+    print("  3. Run the script again and select option 4 or 5 to extract emails")
     print("\n" + "=" * 70 + "\n")
 
 
@@ -687,14 +817,14 @@ def validate_setup():
     print("\n" + "-" * 60)
     if status['authenticated']:
         print_success("\n✓ Ready to extract emails!")
-        print("\nRun: python gmail_extractor.py extract")
+        print(f"\nRun: {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 4 or 5")
     elif status['credentials_valid']:
         print_warning("\n⚠ Credentials configured, but not authenticated yet")
-        print("\nRun: python gmail_extractor.py extract")
+        print(f"\nRun: {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 4 or 5")
         print("(You'll be prompted to authenticate)")
     else:
         print_error("\n✗ Setup incomplete")
-        print("\nRun: python gmail_extractor.py setup")
+        print(f"\nRun: {Colors.BOLD}python gmail_extractor.py{Colors.ENDC} and select option 1 (Setup wizard)")
 
     print("\n" + "=" * 60 + "\n")
 
@@ -719,58 +849,19 @@ def reset_authentication():
 
 def main():
     """Main CLI entry point"""
-    if len(sys.argv) > 1:
-        command = sys.argv[1].lower()
+    print("=" * 60)
+    print(f"{Colors.BOLD}{Colors.HEADER}Gmail Email Extractor CLI{Colors.ENDC}")
+    print("=" * 60)
+    print("\nWhat would you like to do?\n")
+    print(f"{Colors.CYAN}1.{Colors.ENDC} Setup wizard (configure Gmail API)")
+    print(f"{Colors.CYAN}2.{Colors.ENDC} Initialize (create email_addresses.txt)")
+    print(f"{Colors.CYAN}3.{Colors.ENDC} Validate setup")
+    print(f"{Colors.CYAN}4.{Colors.ENDC} Extract emails (metadata only)")
+    print(f"{Colors.CYAN}5.{Colors.ENDC} Extract emails (with attachments)")
+    print(f"{Colors.CYAN}6.{Colors.ENDC} Reset authentication")
+    print(f"{Colors.CYAN}7.{Colors.ENDC} Exit")
 
-        if command == 'setup':
-            interactive_setup_wizard()
-            return
-        elif command == 'init':
-            generate_sample_email_file()
-            return
-        elif command == 'validate':
-            validate_setup()
-            return
-        elif command == 'reset':
-            reset_authentication()
-            return
-        elif command == 'extract':
-            extractor = GmailExtractor()
-            extractor.run()
-            return
-        elif command == 'help' or command == '--help' or command == '-h':
-            print(f"{Colors.BOLD}Gmail Email Extractor CLI{Colors.ENDC}")
-            print("\nUsage: python gmail_extractor.py [command]")
-            print("\nCommands:")
-            print(f"  {Colors.CYAN}setup{Colors.ENDC}     - Interactive setup wizard for Gmail API (recommended for first time)")
-            print(f"  {Colors.CYAN}init{Colors.ENDC}      - Create sample email_addresses.txt file")
-            print(f"  {Colors.CYAN}validate{Colors.ENDC}  - Check setup status and configuration")
-            print(f"  {Colors.CYAN}extract{Colors.ENDC}   - Extract emails (main operation)")
-            print(f"  {Colors.CYAN}reset{Colors.ENDC}     - Reset authentication (delete tokens)")
-            print(f"  {Colors.CYAN}help{Colors.ENDC}      - Show this help message")
-            print("\nQuick Start:")
-            print("  1. python gmail_extractor.py setup      # Run setup wizard")
-            print("  2. python gmail_extractor.py init       # Create email list file")
-            print("  3. Edit email_addresses.txt             # Add email addresses")
-            print("  4. python gmail_extractor.py extract    # Extract emails")
-            print("\nFor more information, see README.md")
-            return
-        else:
-            print_error(f"Unknown command: {command}")
-            print("Run 'python gmail_extractor.py help' for usage information")
-            return
-
-    # Interactive mode
-    print(f"{Colors.BOLD}Gmail Email Extractor CLI{Colors.ENDC}")
-    print("\nWhat would you like to do?")
-    print("1. Setup wizard (configure Gmail API)")
-    print("2. Initialize (create email_addresses.txt)")
-    print("3. Validate setup")
-    print("4. Extract emails")
-    print("5. Reset authentication")
-    print("6. Exit")
-
-    choice = input("\nEnter choice (1-6): ").strip()
+    choice = input(f"\n{Colors.BOLD}Enter choice (1-7):{Colors.ENDC} ").strip()
 
     if choice == '1':
         interactive_setup_wizard()
@@ -780,13 +871,16 @@ def main():
         validate_setup()
     elif choice == '4':
         extractor = GmailExtractor()
-        extractor.run()
+        extractor.run(download_attachments=False)
     elif choice == '5':
-        reset_authentication()
+        extractor = GmailExtractor()
+        extractor.run(download_attachments=True)
     elif choice == '6':
-        print("Goodbye!")
+        reset_authentication()
+    elif choice == '7':
+        print("\nGoodbye!")
     else:
-        print_error("Invalid choice")
+        print_error("\nInvalid choice. Please run the script again and choose 1-7.")
 
 
 if __name__ == '__main__':

@@ -7,50 +7,51 @@ A CLI tool to extract emails to/from specific email addresses from your Gmail ac
 ## Features
 
 - **Interactive Setup Wizard** - Guided Gmail API setup in 3-5 minutes
+- **Unified Interactive Menu** - Simple, easy-to-use interface for all operations
+- **Attachment Download** - Optional download of email attachments
 - Extract emails where specific addresses appear in From, To, or CC fields
+- **Case-insensitive email matching** - Handles emails regardless of capitalization
 - Automatic folder organization by email address
 - HTML email files with headers and formatting
-- CSV file with email metadata (subject, date, from, to, cc)
+- CSV file with email metadata (subject, date, from, to, cc, attachments)
 - Support for Google Workspace accounts
 - Handles pagination for large email volumes
 - **Enhanced error messages** with helpful troubleshooting
 - **Setup validation** to verify configuration
 - **Easy authentication reset**
+- Automatic deduplication of email addresses
 
 ## Quick Start (3 Steps)
 
-### 1. Install dependencies
+### 1. Run the script
 
 ```bash
-pip install -r requirements.txt
+./run.sh
 ```
 
-### 2. Run the setup wizard
+**That's it!** The script automatically:
+- Creates a virtual environment if needed
+- Installs dependencies if needed
+- Runs the gmail extractor
 
-```bash
-python gmail_extractor.py setup
-```
+### 2. First-time setup (one time only)
 
-The interactive wizard will:
+When the menu appears, select option **1 (Setup wizard)**. The wizard will:
 - Guide you through Google Cloud Console setup
 - Automatically open the necessary pages in your browser
 - Validate your credentials
 - Test authentication
 - **Setup time: 3-5 minutes**
 
-### 3. Extract emails
-
-Create your email list and run extraction:
+### 3. Create email list and extract
 
 ```bash
-# Create email addresses file
-python gmail_extractor.py init
-
-# Edit email_addresses.txt and add the email addresses
-
-# Extract emails
-python gmail_extractor.py extract
+./run.sh  # Run again
 ```
+
+1. Select option **2 (Initialize)** to create `email_addresses.txt`
+2. Edit the file and add email addresses (one per line)
+3. Run `./run.sh` again and select option **4** (metadata only) or **5** (with attachments)
 
 Done! Your emails will be in the `extracted_emails/` folder.
 
@@ -67,10 +68,10 @@ Done! Your emails will be in the `extracted_emails/` folder.
 The setup wizard automatically guides you through the process:
 
 ```bash
-python gmail_extractor.py setup
+./run.sh
 ```
 
-The wizard will:
+Then select option **1 (Setup wizard)** from the menu. The wizard will:
 1. Check your current setup status
 2. Open Google Cloud Console pages in your browser
 3. Provide step-by-step instructions for:
@@ -110,16 +111,32 @@ If you prefer to set up manually:
 Then validate your setup:
 
 ```bash
-python gmail_extractor.py validate
+./run.sh
+# Select option 3 (Validate setup)
 ```
 
 ## Usage
 
-### Create email addresses file
+The tool uses an interactive menu system. Simply run:
 
 ```bash
-python gmail_extractor.py init
+./run.sh
 ```
+
+*Note: You can also use `python3 gmail_extractor.py` if you've manually set up a venv*
+
+You'll see a menu with these options:
+1. **Setup wizard** - Configure Gmail API (first-time setup)
+2. **Initialize** - Create email_addresses.txt template
+3. **Validate setup** - Check configuration status
+4. **Extract emails (metadata only)** - Extract emails without attachments
+5. **Extract emails (with attachments)** - Extract emails and download attachments
+6. **Reset authentication** - Delete saved tokens
+7. **Exit** - Quit the program
+
+### Create email addresses file
+
+Run the script and select option **2 (Initialize)**
 
 Edit `email_addresses.txt` and add email addresses (one per line):
 
@@ -127,19 +144,26 @@ Edit `email_addresses.txt` and add email addresses (one per line):
 john.doe@company.com
 jane.smith@example.com
 # Lines starting with # are comments
+
+# Email addresses are case-insensitive
+# These are treated as the same:
+# John.Doe@Company.com
+# john.doe@company.com
 ```
+
+**Note**: Email addresses are automatically normalized to lowercase and duplicates are removed.
 
 ### Extract emails
 
-```bash
-python gmail_extractor.py extract
-```
-
-Or run interactively:
+Run the script:
 
 ```bash
-python gmail_extractor.py
+./run.sh
 ```
+
+Then choose:
+- Option **4** for metadata-only extraction (faster, no attachments)
+- Option **5** to extract emails with attachments
 
 On first extraction, the tool will:
 1. Open your browser for Google authentication
@@ -147,6 +171,14 @@ On first extraction, the tool will:
 3. Save authentication token (in `token.pickle`)
 
 Future runs use the saved token automatically.
+
+### Attachment Download
+
+When selecting option **5 (Extract emails with attachments)**:
+- Attachments are saved in an `attachments/` subfolder for each email
+- Attachment filenames are recorded in the CSV metadata file
+- All attachment types are supported (PDFs, images, documents, etc.)
+- Duplicate attachment filenames are automatically handled
 
 ## Output Structure
 
@@ -156,6 +188,10 @@ extracted_emails/
 │   ├── emails.csv
 │   ├── 0001_Meeting_notes.html
 │   ├── 0002_Project_update.html
+│   ├── 0003_Invoice/
+│   │   └── attachments/
+│   │       ├── invoice.pdf
+│   │       └── receipt.png
 │   └── ...
 └── jane.smith@example.com/
     ├── emails.csv
@@ -163,13 +199,16 @@ extracted_emails/
     └── ...
 ```
 
+**Note**: When attachments are downloaded, emails with attachments get their own subfolder containing an `attachments/` directory.
+
 ### CSV Format
 
 Each `emails.csv` contains:
 
-| Filename | Subject | From | To | Cc | Date | Message ID |
-|----------|---------|------|----|----|------|------------|
-| 0001_Meeting_notes.html | Meeting notes | sender@email.com | you@email.com | colleague@email.com | 2025-01-15 14:30:00 | abc123... |
+| Filename | Subject | From | To | Cc | Date | Message ID | Attachments |
+|----------|---------|------|----|----|------|------------|-------------|
+| 0001_Meeting_notes.html | Meeting notes | sender@email.com | you@email.com | colleague@email.com | 2025-01-15 14:30:00 | abc123... | |
+| 0003_Invoice.html | Invoice for January | billing@company.com | you@email.com | | 2025-01-16 09:15:00 | def456... | invoice.pdf, receipt.png |
 
 ### HTML Files
 
@@ -178,56 +217,55 @@ Each email is saved as an HTML file with:
 - Full email body content
 - Viewable in any web browser
 
-## Command Reference
+## Interactive Menu Reference
 
-### Setup & Configuration
-
-```bash
-# Interactive setup wizard (recommended for first time)
-python gmail_extractor.py setup
-
-# Validate your setup and check status
-python gmail_extractor.py validate
-
-# Create email_addresses.txt template
-python gmail_extractor.py init
-
-# Reset authentication (delete tokens)
-python gmail_extractor.py reset
-```
-
-### Extraction
+The tool now uses a unified interactive menu. Simply run:
 
 ```bash
-# Extract emails (main operation)
-python gmail_extractor.py extract
-
-# Show help
-python gmail_extractor.py help
-
-# Interactive mode (no arguments)
 python gmail_extractor.py
 ```
+
+Menu options:
+
+1. **Setup wizard** - First-time Gmail API configuration (guided)
+2. **Initialize** - Create email_addresses.txt template file
+3. **Validate setup** - Check your configuration and authentication status
+4. **Extract emails (metadata only)** - Fast extraction without attachments
+5. **Extract emails (with attachments)** - Full extraction including attachments
+6. **Reset authentication** - Delete saved tokens (useful for switching accounts)
+7. **Exit** - Quit the program
 
 ### Workflow Example
 
 ```bash
 # First time setup
-python gmail_extractor.py setup      # Run guided setup wizard
-python gmail_extractor.py init       # Create email list file
+./run.sh
+# Select option 1 (Setup wizard)
+# Follow the guided setup process
+
+# Create email list
+./run.sh
+# Select option 2 (Initialize)
 # Edit email_addresses.txt and add addresses
-python gmail_extractor.py extract    # Extract emails
+
+# Extract emails with attachments
+./run.sh
+# Select option 5 (Extract emails with attachments)
 
 # Subsequent runs
-python gmail_extractor.py extract    # Just run extraction
+./run.sh
+# Select option 4 or 5 depending on whether you want attachments
 
 # Troubleshooting
-python gmail_extractor.py validate   # Check setup status
-python gmail_extractor.py reset      # Reset if authentication issues
+./run.sh
+# Select option 3 (Validate setup) - Check status
+# Select option 6 (Reset) - If authentication issues
 ```
 
 ## Files Created
 
+- `run.sh` - Convenience script that handles venv automatically (included)
+- `venv/` - Virtual environment (auto-created by run.sh)
 - `email_addresses.txt` - List of email addresses to extract
 - `credentials.json` - Google API credentials (you provide this)
 - `token.pickle` - Saved authentication token (auto-generated)
@@ -238,7 +276,8 @@ python gmail_extractor.py reset      # Reset if authentication issues
 ### Check your setup status
 
 ```bash
-python gmail_extractor.py validate
+./run.sh
+# Select option 3 (Validate setup)
 ```
 
 This will show the status of all required files and authentication.
@@ -248,24 +287,25 @@ This will show the status of all required files and authentication.
 #### "credentials.json not found" or "invalid"
 
 **Solution:**
-- Run the setup wizard: `python gmail_extractor.py setup`
+- Run the script and select option 1 (Setup wizard)
 - Or manually download OAuth 2.0 **Desktop App** credentials from Google Cloud Console
 - Make sure the file is named exactly `credentials.json`
-- Use the validate command to check: `python gmail_extractor.py validate`
+- Use option 3 (Validate setup) to check status
 
 #### "Permission denied" or "Access not configured"
 
 **Solution:**
 - Ensure Gmail API is enabled in your Google Cloud project
-- Run the setup wizard: `python gmail_extractor.py setup`
+- Run the script and select option 1 (Setup wizard)
 - Check that you selected the correct project in Google Cloud Console
 
 #### Authentication errors or expired token
 
 **Solution:**
 ```bash
-python gmail_extractor.py reset     # Delete old tokens
-python gmail_extractor.py extract   # Will re-authenticate
+./run.sh
+# Select option 6 (Reset authentication) to delete old tokens
+# Then run ./run.sh again and select option 4 or 5 to extract (will re-authenticate)
 ```
 
 #### Rate limiting
@@ -279,7 +319,7 @@ The wizard will print URLs if it can't open your browser automatically. Copy and
 ### Getting Help
 
 If you encounter issues:
-1. Run `python gmail_extractor.py validate` to check your setup
+1. Run the script and select option 3 (Validate setup) to check your configuration
 2. Check that you're using Python 3.7 or higher: `python --version`
 3. Ensure all dependencies are installed: `pip install -r requirements.txt`
 4. Review the error messages - they include helpful troubleshooting tips
@@ -290,6 +330,52 @@ If you encounter issues:
 - The app only requests read-only access to Gmail
 - No data is sent to any third-party servers
 - Email data is saved locally on your computer
+
+## Testing
+
+This project includes a test suite to ensure code quality and robustness.
+
+### Running Tests
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run all tests
+pytest test_gmail_extractor.py -v
+
+# Run tests with coverage report
+pytest test_gmail_extractor.py --cov=gmail_extractor --cov-report=term-missing
+
+# Run specific test class
+pytest test_gmail_extractor.py::TestEmailAddressLoading -v
+```
+
+### Test Coverage
+
+The test suite covers:
+- ✅ Credentials file validation
+- ✅ Email address loading and normalization
+- ✅ Case-insensitive duplicate removal
+- ✅ Comment and whitespace handling
+- ✅ Filename sanitization
+- ✅ Gmail query building
+- ✅ Authentication status checking
+- ✅ Attachment extraction (with attachmentId)
+- ✅ Inline attachment handling
+- ✅ Duplicate attachment filename handling
+- ✅ Nested multipart message attachments
+- ✅ Edge cases (unicode, empty strings, etc.)
+
+Current coverage includes core utility functions and attachment extraction logic
+
+### Writing Tests
+
+When contributing, please:
+1. Add tests for new features
+2. Ensure existing tests still pass
+3. Aim for meaningful coverage of critical paths
+4. Use pytest fixtures for test data
 
 ## Workspace Admin Notes
 
@@ -320,13 +406,13 @@ Contributions are welcome! This is an open-source project under the MIT License.
 
 ### Areas for Improvement
 
-- Add support for attachments download
 - Implement incremental extraction (only new emails)
 - Add support for filtering by date range
 - Add export to other formats (PDF, TXT, MBOX)
 - Improve error handling and retry logic
 - Add progress bars for large extractions
 - Support for batch processing multiple accounts
+- Add command-line arguments for automation/scripting
 
 ## Credits
 

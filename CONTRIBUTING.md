@@ -120,11 +120,11 @@ def extract_email_header(headers: List[Dict], header_name: str) -> str:
 We especially welcome contributions in these areas:
 
 ### High Priority
-- [ ] Add unit tests
-- [ ] Add attachment download support
+- [ ] Add unit tests for Gmail API interactions
 - [ ] Implement incremental extraction (only new emails)
 - [ ] Add date range filtering
-- [ ] Improve error handling
+- [ ] Improve error handling and retry logic
+- [ ] Add command-line arguments for automation
 
 ### Medium Priority
 - [ ] Add progress bars for long operations
@@ -142,21 +142,77 @@ We especially welcome contributions in these areas:
 
 ## Testing
 
-Currently, this project lacks automated tests. Adding tests is a great way to contribute!
+This project includes a pytest test suite. Always run tests before submitting a PR!
+
+### Running Tests
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run all tests
+pytest test_gmail_extractor.py -v
+
+# Run tests with coverage
+pytest test_gmail_extractor.py --cov=gmail_extractor --cov-report=html
+
+# Run specific test
+pytest test_gmail_extractor.py::TestEmailAddressLoading::test_case_insensitive_normalization -v
+```
+
+### Writing Tests
+
+When adding new features:
+
+1. **Write tests first** (TDD approach recommended)
+2. **Test edge cases**: empty inputs, invalid data, unicode, etc.
+3. **Use pytest fixtures** for reusable test data
+4. **Mock external dependencies**: Gmail API, file I/O when appropriate
+5. **Test both success and failure paths**
+
+Example test:
+```python
+def test_your_feature(tmp_path):
+    """Test description"""
+    # Arrange - set up test data
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test data")
+
+    # Act - run the function
+    result = your_function(test_file)
+
+    # Assert - verify results
+    assert result == expected_value
+```
+
+### Test Coverage Goals
+
+- Core utility functions: 80%+ coverage
+- Input validation: 100% coverage
+- Happy paths: 100% coverage
+- Error handling: 80%+ coverage
+
+Current coverage: ~21% (see `pytest --cov` output)
 
 ### Manual Testing Checklist
 
-Before submitting a PR, please test:
+Before submitting a PR, also manually test:
 
-- [ ] Setup wizard completes successfully
-- [ ] Credentials validation works
+- [ ] Setup wizard completes successfully (Menu option 1)
+- [ ] Credentials validation works (Menu option 3)
 - [ ] Email extraction works for multiple addresses
-- [ ] CSV files are generated correctly
+- [ ] Metadata-only extraction works (Menu option 4)
+- [ ] Attachment extraction works (Menu option 5)
+- [ ] CSV files include Attachments column when using option 5
+- [ ] Attachments are saved in correct folder structure
 - [ ] HTML files render properly
 - [ ] Error messages are helpful
-- [ ] Help command shows all options
-- [ ] Validate command shows correct status
-- [ ] Reset command clears authentication
+- [ ] Interactive menu displays all options correctly
+- [ ] Validate command shows correct status (Menu option 3)
+- [ ] Reset command clears authentication (Menu option 6)
 
 ## Documentation
 
